@@ -43,7 +43,7 @@ impl YaProviderCommand {
             .stdout(Stdio::piped())
             .output()
             .await
-            .context("failed to get ya-provider configuration")?;
+            .context(format!("failed to get ya-provider configuration {:?}", self.cmd))?;
 
         serde_json::from_slice(output.stdout.as_slice()).context("parsing ya-provider config get")
     }
