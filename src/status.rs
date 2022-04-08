@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use ansi_term::{Colour, Style};
 use anyhow::{anyhow, Result};
-use bigdecimal::{BigDecimal,FromPrimitive};
+use bigdecimal::{BigDecimal, FromPrimitive};
 use futures::prelude::*;
 use prettytable::{cell, format, row, Table};
 use strum::VariantNames;
@@ -85,12 +85,13 @@ pub async fn run() -> Result</*exit code*/ i32> {
             .underline()
             .paint("Status")]);
         table.add_empty_row();
+        let version = cmd.yagna()?.version().await?;
         if is_running {
             table.add_row(row![
                 "Service",
                 Style::new().fg(Colour::Green).paint("is running")
             ]);
-            if let Some(pending) = cmd.yagna()?.version().await?.pending {
+            if let Some(pending) = version.pending {
                 let ver = format!("{} released!", pending.version);
                 table.add_row(row![
                     "New Version",
@@ -103,13 +104,10 @@ pub async fn run() -> Result</*exit code*/ i32> {
                 Style::new().fg(Colour::Red).paint("is not running")
             ]);
         }
-        table.add_row(row!["Version", ya_compile_time_utils::semver_str!()]);
-        table.add_row(row!["Commit", ya_compile_time_utils::git_rev()]);
-        table.add_row(row!["Date", ya_compile_time_utils::build_date()]);
-        table.add_row(row![
-            "Build",
-            ya_compile_time_utils::build_number_str().unwrap_or("-")
-        ]);
+        table.add_row(row!["Version", version.current.version]);
+        table.add_row(row!["Commit", "TODO"]);
+        table.add_row(row!["Date", "TODO"]);
+        table.add_row(row!["Build", "TODO"]);
 
         table.add_empty_row();
         table.add_row(row!["Node Name", &config.node_name.unwrap_or_default()]);

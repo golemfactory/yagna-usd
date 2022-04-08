@@ -24,7 +24,6 @@ pub struct ProviderConfig {
     pub account: Option<NodeId>,
 }
 
-
 pub type UsageDef = BTreeMap<String, f64>;
 
 #[derive(Deserialize)]
@@ -43,9 +42,11 @@ impl YaProviderCommand {
             .stdout(Stdio::piped())
             .output()
             .await
-            .context(format!("failed to get ya-provider configuration {:?}", self.cmd))?;
+            .context(format!(
+                "failed to get ya-provider configuration {:?}",
+                self.cmd
+            ))?;
 
         serde_json::from_slice(output.stdout.as_slice()).context("parsing ya-provider config get")
     }
-
 }
