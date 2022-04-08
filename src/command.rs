@@ -12,7 +12,7 @@ pub use provider::*;
 pub use yagna::*;
 
 pub struct YaCommand {
-    base_path: Box<Path>,
+    base_path: Option<Box<Path>>,
 }
 
 impl YaCommand {
@@ -32,13 +32,24 @@ impl YaCommand {
             .parent()
             .ok_or_else(|| anyhow::anyhow!("Unable to resolve yagna binaries location"))?;
 
+        if !base_path.join("yagna").exists() || !base_path.join("ya-provider").exists() {
+            return Ok(Self { base_path: None });
+        }
+
         Ok(Self {
-            base_path: base_path.into(),
+            base_path: Some(base_path.into()),
         })
     }
 
+    pub fn cmd(&self, program: &str) -> Command {
+        match &self.base_path {
+            Some(path) => Command::new(path.join(program)),
+            None => Command::new(program),
+        }
+    }
+
     pub fn ya_provider(&self) -> anyhow::Result<YaProviderCommand> {
-        let mut cmd = Command::new(self.base_path.join("ya-provider"));
+        let mut cmd = self.cmd("ya-provider");
 
         if let Some(user_dirs) = UserDirs::new() {
             let plugins_dir = user_dirs.home_dir().join(".local/lib/yagna/plugins");
@@ -51,7 +62,7 @@ impl YaCommand {
     }
 
     pub fn yagna(&self) -> anyhow::Result<YagnaCommand> {
-        let cmd = Command::new(self.base_path.join("yagna"));
+        let cmd = self.cmd("yagna");
         Ok(YagnaCommand { cmd })
     }
 }

@@ -1,3 +1,3 @@
 # yagna-usd
 
-caveat: binary needs to be in the same directory where `yagna` and `ya-provider` are.
+Extension to [golemsp](https://github.com/golemfactory/yagna/tree/master/golem_cli) which displays account balance also in USD.

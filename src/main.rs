@@ -38,7 +38,6 @@ pub struct CompleteCommand {
 #[structopt(about = clap::crate_description!())]
 #[structopt(global_setting = clap::AppSettings::ColoredHelp)]
 #[structopt(global_setting = clap::AppSettings::DeriveDisplayOrder)]
-#[structopt(version = ya_compile_time_utils::version_describe!())]
 struct StartupConfig {
     #[structopt(flatten)]
     commands: Commands,

@@ -85,13 +85,12 @@ pub async fn run() -> Result</*exit code*/ i32> {
             .underline()
             .paint("Status")]);
         table.add_empty_row();
-        let version = cmd.yagna()?.version().await?;
         if is_running {
             table.add_row(row![
                 "Service",
                 Style::new().fg(Colour::Green).paint("is running")
             ]);
-            if let Some(pending) = version.pending {
+            if let Some(pending) = cmd.yagna()?.version().await?.pending {
                 let ver = format!("{} released!", pending.version);
                 table.add_row(row![
                     "New Version",
@@ -104,10 +103,11 @@ pub async fn run() -> Result</*exit code*/ i32> {
                 Style::new().fg(Colour::Red).paint("is not running")
             ]);
         }
-        table.add_row(row!["Version", version.current.version]);
-        table.add_row(row!["Commit", "TODO"]);
-        table.add_row(row!["Date", "TODO"]);
-        table.add_row(row!["Build", "TODO"]);
+        let version = cmd.yagna()?.version_raw().await?;
+        table.add_row(row!["Version", version.version]);
+        table.add_row(row!["Commit", version.sha]);
+        table.add_row(row!["Date", version.date]);
+        table.add_row(row!["Build", version.build]);
 
         table.add_empty_row();
         table.add_row(row!["Node Name", &config.node_name.unwrap_or_default()]);
@@ -166,41 +166,44 @@ pub async fn run() -> Result</*exit code*/ i32> {
             ]);
             let total_amount: BigDecimal =
                 payment_statuses.values().cloned().map(|ps| ps.amount).sum();
-            
+
             let currency = "usd";
             match ureq::get("https://api.coingecko.com/api/v3/simple/price")
-                .query("ids","golem")
-                .query("vs_currencies",currency)
-                .call() {
+                .query("ids", "golem")
+                .query("vs_currencies", currency)
+                .call()
+            {
                 Ok(response) => {
                     let response_json: serde_json::Value = response.into_json().unwrap();
                     match response_json["golem"][currency].as_f64() {
                         Some(glm_price) => {
-                            table.add_row(row!["GLM price",
-                                format!("{} {}", glm_price, currency.to_uppercase())]);
+                            table.add_row(row![
+                                "GLM price",
+                                format!("{} {}", glm_price, currency.to_uppercase())
+                            ]);
 
                             let rate_bd: BigDecimal = BigDecimal::from_f64(glm_price).unwrap();
                             let value: BigDecimal = total_amount.clone() * rate_bd;
                             table.add_row(row![
-                                    "total value",
-                                    format!("{} {}", BigDecimal::round(&value,2), currency.to_uppercase())
-                                ]);
+                                "total value",
+                                format!(
+                                    "{} {}",
+                                    BigDecimal::round(&value, 2),
+                                    currency.to_uppercase()
+                                )
+                            ]);
                         }
                         None => {
                             table.add_row(row![
-                                    "GLM price",
-                                    format!("Unsupported currency: {}", currency)
-                                ]);
+                                "GLM price",
+                                format!("Unsupported currency: {}", currency)
+                            ]);
                         }
                     };
                 }
                 Err(_) => {
-                    table.add_row(row![
-                            "GLM price",
-                            "Prices currently unavailable"
-                        ]);
+                    table.add_row(row!["GLM price", "Prices currently unavailable"]);
                 }
-
             };
             table.add_empty_row();
 

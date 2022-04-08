@@ -1,7 +1,8 @@
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
+use regex::Regex;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -13,6 +14,13 @@ use ya_core_model::payment::local::{
     InvoiceStats, InvoiceStatusNotes, NetworkName, StatusNotes, StatusResult,
 };
 use ya_core_model::version::VersionInfo;
+
+pub struct VersionRaw {
+    pub version: String,
+    pub sha: String,
+    pub date: String,
+    pub build: String,
+}
 
 pub struct PaymentPlatform {
     pub platform: &'static str,
@@ -209,7 +217,7 @@ pub struct YagnaCommand {
 }
 
 impl YagnaCommand {
-    async fn run<T: DeserializeOwned>(self) -> anyhow::Result<T> {
+    async fn run(self) -> anyhow::Result<Vec<u8>> {
         let mut cmd = self.cmd;
         log::debug!("Running: {:?}", cmd);
         let output = cmd
@@ -218,9 +226,9 @@ impl YagnaCommand {
             .stderr(Stdio::piped())
             .output()
             .await?;
+
         if output.status.success() {
-            log::trace!("{}", String::from_utf8_lossy(&output.stdout));
-            Ok(serde_json::from_slice(&output.stdout)?)
+            Ok(output.stdout)
         } else {
             Err(anyhow::anyhow!(
                 "{:?} failed.: Stdout:\n{}\nStderr:\n{}",
@@ -231,15 +239,37 @@ impl YagnaCommand {
         }
     }
 
+    async fn run_json<T: DeserializeOwned>(mut self) -> anyhow::Result<T> {
+        self.cmd.args(&["--json"]);
+        let stdout = self.run().await?;
+        Ok(serde_json::from_slice(&stdout)?)
+    }
+
     pub async fn default_id(mut self) -> anyhow::Result<Id> {
-        self.cmd.args(&["--json", "id", "show"]);
-        let output: Result<Id, String> = self.run().await?;
+        self.cmd.args(&["id", "show"]);
+        let output: Result<Id, String> = self.run_json().await?;
         output.map_err(anyhow::Error::msg)
     }
 
     pub async fn version(mut self) -> anyhow::Result<VersionInfo> {
-        self.cmd.args(&["--json", "version", "show"]);
-        self.run().await
+        self.cmd.args(&["version", "show"]);
+        self.run_json().await
+    }
+
+    pub async fn version_raw(mut self) -> anyhow::Result<VersionRaw> {
+        self.cmd.args(&["--version"]);
+        let output = self.run().await?;
+        let re = Regex::new(r"yagna ([0-9.]+) \(([a-z0-9]+) ([-0-9]+) (build #(\d+))?")?;
+        if let Some(cap) = re.captures(&String::from_utf8_lossy(&output)) {
+            Ok(VersionRaw {
+                version: cap[1].to_string(),
+                sha: cap[2].to_string(),
+                date: cap[3].to_string(),
+                build: cap[5].to_string(),
+            })
+        } else {
+            bail!("cannot parse yagna version {:?}", output)
+        }
     }
 
     pub async fn payment_status(
@@ -248,23 +278,23 @@ impl YagnaCommand {
         network: &NetworkName,
         payment_driver: &PaymentDriver,
     ) -> anyhow::Result<StatusResult> {
-        self.cmd.args(&["--json", "payment", "status"]);
+        self.cmd.args(&["payment", "status"]);
         self.cmd.args(&["--account", address]);
 
         let payment_platform = payment_driver.platform(network)?;
         self.cmd.args(&["--network", &network.to_string()]);
         self.cmd.args(&["--driver", payment_platform.driver]);
 
-        self.run().await
+        self.run_json().await
     }
 
     pub async fn invoice_status(mut self) -> anyhow::Result<InvoiceStats> {
-        self.cmd.args(&["--json", "payment", "invoice", "status"]);
-        self.run().await
+        self.cmd.args(&["payment", "invoice", "status"]);
+        self.run_json().await
     }
 
     pub async fn activity_status(mut self) -> anyhow::Result<ActivityStatus> {
-        self.cmd.args(&["--json", "activity", "status"]);
-        self.run().await
+        self.cmd.args(&["activity", "status"]);
+        self.run_json().await
     }
 }
