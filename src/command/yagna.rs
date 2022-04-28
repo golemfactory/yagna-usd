@@ -259,13 +259,13 @@ impl YagnaCommand {
     pub async fn version_raw(mut self) -> anyhow::Result<VersionRaw> {
         self.cmd.args(&["--version"]);
         let output = self.run().await?;
-        let re = Regex::new(r"yagna ([0-9.]+) \(([a-z0-9]+) ([-0-9]+) (build #(\d+))?")?;
+        let re = Regex::new(r"yagna ([0-9.]+) \(([a-z0-9]+) ([-0-9]+)( build #(\d+))?")?;
         if let Some(cap) = re.captures(&String::from_utf8_lossy(&output)) {
             Ok(VersionRaw {
                 version: cap[1].to_string(),
                 sha: cap[2].to_string(),
                 date: cap[3].to_string(),
-                build: cap[5].to_string(),
+                build: cap.get(5).map(|m| m.as_str()).unwrap_or_default().to_string(),
             })
         } else {
             bail!("cannot parse yagna version {:?}", output)
